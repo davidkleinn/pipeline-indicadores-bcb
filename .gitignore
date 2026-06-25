@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 venv/
+.venv/
 
 # Variáveis sensíveis (NUNCA commitar o .env real)
 .env
