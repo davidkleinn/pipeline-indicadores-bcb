@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+
+# Variáveis sensíveis (NUNCA commitar o .env real)
+.env
+
+# dbt
+dbt_packages/
+target/
+logs/
+
+# Dados locais (ignorar conteúdo, mas manter as pastas via .gitkeep)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# SO e IDEs
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
