@@ -1,0 +1,104 @@
+# docker-compose.yml
+
+# x-airflow-common é um "anchor" YAML: evita repetir a mesma config
+# nos três serviços do Airflow. O <<: *airflow-common "herda" tudo isso.
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.9.3
+  environment:
+    &airflow-common-env
+    # LocalExecutor: tasks rodam no mesmo processo do scheduler.
+    # Suficiente para este projeto — sem Redis, sem workers distribuídos.
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+    # Airflow guarda seus metadados (DAG runs, task states) no banco 'airflow'
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${AIRFLOW_DB}
+
+    # Fernet key: criptografa conexões e variáveis sensíveis no banco do Airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+
+    # Permite que a DAG faça `from extract.bcb_client import ...`
+    PYTHONPATH: /opt/airflow
+
+    # Connection string pro banco de dados do pipeline (usada na Fase 2b)
+    PIPELINE_DB_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${PIPELINE_DB}
+
+  volumes:
+    - ./dags:/opt/airflow/dags          # onde a DAG vai morar
+    - ./extract:/opt/airflow/extract    # o bcb_client.py fica acessível no container
+    - ./logs:/opt/airflow/logs          # logs das tasks
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy        # só inicia depois do Postgres estar pronto
+
+services:
+
+  # ── Banco de dados ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB}        # cria automaticamente o banco 'airflow'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # persistência entre restarts
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh  # cria pipeline_bcb
+    ports:
+      - "5432:5432"                     # expõe pra você conectar com DBeaver/psql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+  # ── Inicialização do Airflow (roda uma vez e sai) ───────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USER:-admin} \
+          --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@pipeline.local
+        echo "Airflow inicializado com sucesso."
+    restart: on-failure                 # retenta se o Postgres ainda não estava pronto
+
+  # ── Interface web ────────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully  # só sobe depois do init terminar
+
+  # ── Agendador de tasks ───────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+# Volume nomeado: dados do Postgres sobrevivem a `docker compose down`
+# (diferente de um bind mount, é gerenciado pelo Docker)
+volumes:
+  postgres_data:
