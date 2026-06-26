@@ -27,6 +27,8 @@ x-airflow-common:
 
     # Connection string pro banco de dados do pipeline (usada na Fase 2b)
     PIPELINE_DB_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${PIPELINE_DB}
+    _PIP_ADDITIONAL_REQUIREMENTS: apache-airflow-providers-postgres
+    AIRFLOW_CONN_PIPELINE_BCB_PG: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${PIPELINE_DB}"
 
   volumes:
     - ./dags:/opt/airflow/dags          # onde a DAG vai morar
