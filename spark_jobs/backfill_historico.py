@@ -15,10 +15,6 @@ from sqlalchemy import create_engine, text
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env", encoding="utf-8")
 
-print("PIPELINE_DB:", os.environ.get("PIPELINE_DB"))
-print("POSTGRES_USER:", os.environ.get("POSTGRES_USER"))
-print("POSTGRES_PASSWORD:", repr(os.environ.get("POSTGRES_PASSWORD")))
-
 RAW_DIR = ROOT / "data" / "raw" / "historico"
 OUTPUT_PARQUET = ROOT / "data" / "processed" / "historico_indicadores"
 
@@ -115,56 +111,46 @@ def escrever_parquet(df):
 
 
 # ─── Carga no Postgres: truncate + reload ──────────────────────────────────
-# ─── Carga no Postgres: truncate + reload ──────────────────────────────────
 def carregar_postgres(df):
-    print("Convertendo para Pandas para inserção...")
     pdf = df.select(
         "codigo_serie", "data", "valor", "media_movel_30d", "variacao_pct", "ano"
     ).toPandas()
 
-    # O FIX DO DATETIME: Força a conversão pra datetime do pandas e pega a data
     pdf["data"] = pd.to_datetime(pdf["data"]).dt.date
-    
-    # Transforma NaN (nulo do Pandas) em None (NULL do Postgres)
     pdf = pdf.where(pd.notnull(pdf), None)
 
-    # Limpeza agressiva das credenciais pra tirar qualquer aspa invisível
-    import os
-    db = os.environ.get("PIPELINE_DB", "pipeline_bcb").replace("'", "").replace('"', '').strip()
-    user = os.environ.get("POSTGRES_USER", "airflow").replace("'", "").replace('"', '').strip()
-    pwd = os.environ.get("POSTGRES_PASSWORD", "airflow").replace("'", "").replace('"', '').strip()
+    user = os.environ["POSTGRES_USER"].strip()
+    pwd  = os.environ["POSTGRES_PASSWORD"].strip()
+    db   = os.environ["PIPELINE_DB"].strip()
+    port = int(os.environ.get("POSTGRES_HOST_PORT", "5432"))
 
-    print("Conectando no PostgreSQL via psycopg2 (o que funciona de verdade)...")
-    import psycopg2
-    from psycopg2.extras import execute_values
-    
     conn = psycopg2.connect(
-        host="127.0.0.1",
-        port=5433,
+        host="127.0.0.1",   # IP explícito: evita resolução de nome no Windows
+        port=port,
         dbname=db,
         user=user,
-        password=pwd
+        password=pwd,
     )
-    conn.autocommit = True
     cur = conn.cursor()
 
     try:
-        print("Esvaziando tabela raw.bcb_historico (Truncate)...")
         cur.execute("TRUNCATE TABLE raw.bcb_historico;")
-
         registros = list(pdf.itertuples(index=False, name=None))
-        print("Inserindo dados em lote...")
-        
         execute_values(
             cur,
             """
-            INSERT INTO raw.bcb_historico (codigo_serie, data, valor, media_movel_30d, variacao_pct, ano)
+            INSERT INTO raw.bcb_historico
+                (codigo_serie, data, valor, media_movel_30d, variacao_pct, ano)
             VALUES %s
             """,
             registros,
-            page_size=2000
+            page_size=2000,
         )
-        print(f"🎉 ACABOU A TORTURA! SUCESSO ABSOLUTO! {len(registros)} linhas no banco!")
+        conn.commit()
+        print(f"Carregados {len(registros)} registros em raw.bcb_historico.")
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
