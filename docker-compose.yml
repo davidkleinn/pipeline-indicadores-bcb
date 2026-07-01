@@ -53,7 +53,7 @@ services:
       - postgres_data:/var/lib/postgresql/data   # persistência entre restarts
       - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh  # cria pipeline_bcb
     ports:
-      - "5432:5432"                     # expõe pra você conectar com DBeaver/psql
+      - "5433:5432"                     # expõe pra você conectar com DBeaver/psql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
       interval: 10s
