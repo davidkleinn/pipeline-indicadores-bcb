@@ -1,0 +1,32 @@
+# dbt/pipeline_bcb/models/staging/sources.yml
+version: 2
+
+sources:
+  - name: raw
+    database: pipeline_bcb
+    schema: raw
+    description: "Dados brutos ingeridos diretamente da API do Banco Central do Brasil."
+    tables:
+      - name: bcb_series
+        description: "Carga diária dos últimos valores de cada série econômica."
+        columns:
+          - name: codigo_serie
+            description: "Código da série no SGS do BCB (1=Dólar, 11=Selic, 433=IPCA)."
+          - name: data
+            description: "Data de referência do valor."
+          - name: valor
+            description: "Valor numérico da série na data."
+          - name: data_extracao
+            description: "Timestamp de quando a linha foi inserida."
+
+      - name: bcb_historico
+        description: "Histórico completo das séries, processado pelo job PySpark."
+        columns:
+          - name: codigo_serie
+          - name: data
+          - name: valor
+          - name: media_movel_30d
+            description: "Média móvel de 30 períodos (só para séries diárias: Selic e Dólar)."
+          - name: variacao_pct
+            description: "Variação percentual em relação ao período anterior."
+          - name: ano
