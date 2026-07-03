@@ -33,3 +33,7 @@ models:
   pipeline_bcb:
     staging:
       +materialized: view
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table

@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: fct_indicadores_diarios
+    description: "Tabela fato com todos os indicadores no formato longo, enriquecida com a dimensão de data."
+    columns:
+      - name: data
+        description: "Data de referência."
+        data_tests:
+          - not_null
+      - name: indicador
+        description: "Nome do indicador (Selic, Dolar, IPCA)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Selic', 'Dolar', 'IPCA']
+      - name: valor
+        description: "Valor do indicador na data."
+        data_tests:
+          - not_null
+
+  - name: mart_indicadores_mensal
+    description: "Agregação mensal dos indicadores com variação percentual mês a mês."
+    columns:
+      - name: ano_mes
+        data_tests:
+          - not_null
+      - name: indicador
+        data_tests:
+          - not_null
+      - name: valor_medio
+        data_tests:
+          - not_null
+
+  - name: dim_data
+    columns:
+      - name: data
+        data_tests:
+          - not_null
+          - unique

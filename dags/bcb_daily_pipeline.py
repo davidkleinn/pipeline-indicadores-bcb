@@ -1,9 +1,9 @@
 # dags/bcb_daily_pipeline.py
-
+import os
 from datetime import datetime, timedelta
-
 from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.operators.bash import BashOperator
 
 # ─── Definição da DAG ──────────────────────────────────────────────────────
 @dag(
@@ -92,12 +92,47 @@ def bcb_daily_pipeline():
             cursor.close()
             conn.close()
 
+    # ── Task 3 e 4: transformação via dbt ──────────────────────────────────
+    # BashOperator (não astronomer-cosmos) por simplicidade — suficiente
+    # pra um projeto deste porte, sem dependência pesada adicional.
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command="cd /opt/airflow/dbt/pipeline_bcb && /opt/airflow/dbt_venv/bin/dbt run --select marts",
+        env={
+            "POSTGRES_USER": os.environ["POSTGRES_USER"],
+            "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
+            "PIPELINE_DB": os.environ["PIPELINE_DB"],
+            # Aponta pra rede interna do Docker, não pro 127.0.0.1:5433
+            # que só existe fora do container (ver profiles.yml).
+            "DBT_POSTGRES_HOST": "postgres",
+            "DBT_POSTGRES_PORT": "5432",
+            "POSTGRES_HOST_PORT": "5432", # <-- Adicione esta linha também!
+            # dbt procura profiles.yml em $DBT_PROFILES_DIR — mais direto
+            # e explícito do que manipular a variável HOME.
+            "DBT_PROFILES_DIR": "/opt/airflow/.dbt",
+        },
+    )
+
+    dbt_test = BashOperator(
+        task_id="dbt_test",
+        bash_command="cd /opt/airflow/dbt/pipeline_bcb && /opt/airflow/dbt_venv/bin/dbt test --select marts",
+        env={
+            "POSTGRES_USER": os.environ["POSTGRES_USER"],
+            "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
+            "PIPELINE_DB": os.environ["PIPELINE_DB"],
+            "DBT_POSTGRES_HOST": "postgres",
+            "DBT_POSTGRES_PORT": "5432",
+            "POSTGRES_HOST_PORT": "5432", # <-- Adicione esta linha também!
+            "DBT_PROFILES_DIR": "/opt/airflow/.dbt",
+        },
+    )
+
     # ── Orquestração: define a dependência entre as tasks ──────────────────
     # A TaskFlow API passa o retorno de extract_series() como argumento
     # para load_raw_to_postgres() automaticamente via XCom.
     dados = extract_series()
-    load_raw_to_postgres(dados)
-
+    tabela_carregada = load_raw_to_postgres(dados)
+    tabela_carregada >> dbt_run >> dbt_test
 
 # Instancia a DAG — sem isso o Airflow não a reconhece
 dag_instance = bcb_daily_pipeline()

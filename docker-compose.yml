@@ -4,7 +4,8 @@
 # nos três serviços do Airflow. O <<: *airflow-common "herda" tudo isso.
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.9.3
+  build: .
+  #image: apache/airflow:2.9.3
   environment:
     &airflow-common-env
     # LocalExecutor: tasks rodam no mesmo processo do scheduler.
@@ -27,13 +28,17 @@ x-airflow-common:
 
     # Connection string pro banco de dados do pipeline (usada na Fase 2b)
     PIPELINE_DB_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${PIPELINE_DB}
-    _PIP_ADDITIONAL_REQUIREMENTS: apache-airflow-providers-postgres
     AIRFLOW_CONN_PIPELINE_BCB_PG: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${PIPELINE_DB}"
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    PIPELINE_DB: ${PIPELINE_DB}
 
   volumes:
-    - ./dags:/opt/airflow/dags          # onde a DAG vai morar
-    - ./extract:/opt/airflow/extract    # o bcb_client.py fica acessível no container
-    - ./logs:/opt/airflow/logs          # logs das tasks
+    - ./dags:/opt/airflow/dags
+    - ./extract:/opt/airflow/extract
+    - ./logs:/opt/airflow/logs
+    - ./dbt:/opt/airflow/dbt                                        # ← novo
+    - ${DBT_PROFILES_HOST_PATH}:/opt/airflow/.dbt/profiles.yml:ro    # ← novo
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on

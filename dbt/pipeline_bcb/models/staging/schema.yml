@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_selic
+    columns:
+      - name: data
+        data_tests:
+          - not_null
+          - unique
+      - name: taxa_selic_pct
+        data_tests:
+          - not_null
+
+  - name: stg_dolar
+    columns:
+      - name: data
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_ipca
+    columns:
+      - name: data
+        data_tests:
+          - not_null
+          - unique
