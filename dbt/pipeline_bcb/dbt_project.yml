@@ -37,3 +37,4 @@ models:
       +materialized: ephemeral
     marts:
       +materialized: table
+
