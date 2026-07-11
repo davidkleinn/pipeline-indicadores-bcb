@@ -1,0 +1,49 @@
+name: dbt CI
+
+on:
+  push:
+    paths:
+      - 'dbt/**'
+  pull_request:
+    paths:
+      - 'dbt/**'
+
+jobs:
+  dbt-compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dbt-core e dbt-postgres
+        # Versões pinadas exatamente iguais ao ambiente local (confira com
+        # `pip freeze` antes de commitar) — evita divergência entre dev e CI.
+        run: pip install dbt-core==1.11.* dbt-postgres==1.10.*
+
+      - name: Criar profiles.yml mínimo para CI (sem banco real)
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          pipeline_bcb:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: staging
+                threads: 1
+          EOF
+
+      - name: dbt compile (valida SQL e DAG sem banco real)
+        working-directory: dbt/pipeline_bcb
+        run: dbt compile
