@@ -5,3 +5,6 @@ pyspark
 psycopg2-binary
 dbt-core
 dbt-postgres
+google-cloud-bigquery
+db-dtypes
+pandas-gbq
