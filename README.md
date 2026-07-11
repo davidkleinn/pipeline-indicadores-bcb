@@ -39,6 +39,7 @@ flowchart LR
 
     MARTS --> BQ[(BigQuery)]
     MARTS --> BI[Dashboard Power BI]
+```
 
 ## Decisões Técnicas
 
