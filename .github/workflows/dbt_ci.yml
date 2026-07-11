@@ -24,7 +24,7 @@ jobs:
       - name: Instalar dbt-core e dbt-postgres
         # Versões pinadas exatamente iguais ao ambiente local (confira com
         # `pip freeze` antes de commitar) — evita divergência entre dev e CI.
-        run: pip install dbt-core==1.11.* dbt-postgres==1.10.*
+        run: pip install dbt-core==1.11.12 dbt-postgres==1.10.2
 
       - name: Criar profiles.yml mínimo para CI (sem banco real)
         run: |
