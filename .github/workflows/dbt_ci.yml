@@ -11,6 +11,22 @@ on:
 jobs:
   dbt-compile:
     runs-on: ubuntu-latest
+    
+    # A MÁGICA: Sobe um banco Postgres vazio e descartável na porta 5432
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -21,12 +37,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dbt-core e dbt-postgres
-        # Versões pinadas exatamente iguais ao ambiente local (confira com
-        # `pip freeze` antes de commitar) — evita divergência entre dev e CI.
+      - name: Instalar dbt
         run: pip install dbt-core==1.11.12 dbt-postgres==1.10.2
 
-      - name: Criar profiles.yml mínimo para CI (sem banco real)
+      - name: Criar profiles.yml mínimo para CI
         run: |
           mkdir -p ~/.dbt
           cat > ~/.dbt/profiles.yml << 'EOF'
@@ -44,6 +58,6 @@ jobs:
                 threads: 1
           EOF
 
-      - name: dbt compile (valida SQL e DAG sem banco real)
+      - name: dbt compile
         working-directory: dbt/pipeline_bcb
         run: dbt compile
