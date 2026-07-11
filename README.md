@@ -22,7 +22,7 @@ dele. A seção abaixo documenta esse raciocínio.
 
 ## Arquitetura
 
-\`\`\`mermaid
+```mermaid
 flowchart LR
     API[API SGS - Banco Central] -->|extract_daily.py| DAG[Airflow DAG diária]
     DAG --> RAW1[(Postgres: raw.bcb_series)]
@@ -39,7 +39,6 @@ flowchart LR
 
     MARTS --> BQ[(BigQuery)]
     MARTS --> BI[Dashboard Power BI]
-\`\`\`
 
 ## Decisões Técnicas
 
